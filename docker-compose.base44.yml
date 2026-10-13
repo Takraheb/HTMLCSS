@@ -1,0 +1,33 @@
+# Base44 sandbox/dev environment for this repository.
+#
+# The project is a set of plain static HTML pages (no package manager, no build
+# step, no backend, no external services). It is served as-is by nginx, with the
+# repository bind-mounted into the document root, so editing any .html file is
+# visible in the preview immediately without a rebuild or restart.
+#
+# Run from the repo root:
+#   docker compose -f docker-compose.base44.yml up -d --build
+# Entry point: http://localhost:3000/  (-> index.html)
+
+services:
+  web:
+    image: nginx:alpine
+    restart: on-failure
+    ports:
+      - "3000:80"
+    volumes:
+      # The whole checkout is the document root; read-only because nginx never
+      # writes to it. Files are read from disk per request, so content edits are
+      # live.
+      - ./:/usr/share/nginx/html:ro
+      # Custom config: the image default runs workers as `nginx`, which cannot
+      # read the mode-700 sandbox mount and answers 403 for every request.
+      - ./nginx.base44.conf:/etc/nginx/nginx.conf:ro
+    healthcheck:
+      # Probe over IPv4: inside this image `localhost` resolves to ::1 first and
+      # nginx only listens on IPv4, which made the check fail.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
